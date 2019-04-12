@@ -1,4 +1,18 @@
-CTPS = {};
+// 'Trips to Boston' app for LRTP 2040 Needs Assessment
+//
+// The source code for this app was originally written by Mary McShane for the 2014 LRTP using OpenLayers version 2.
+// It was migrated to OpenLayers version 3 by Ethan Ebinger in 2017.
+// In 2018 it was (minimally) modified by yours truly to read data from a PostGIS data source rather than an Oracle/ArcGIS datasource.
+//
+// It is currently being modified by yours truly for the 2040 LRTP. 
+//
+// It is clear that aside from modifying the app fetch data for the 2040 LRTP, the code for this app is in need of a lot of TLC. 
+// How much can be applied is a function of budget and schedule matters outside of this reporter's control. 
+// The only requirement is to make the damned thing work with the 2016/2040 data.
+//
+// BK 12 April 2019
+
+var CTPS = {};
 CTPS.bostonTrips = {};
 CTPS.bostonTrips.map = {};
 CTPS.bostonTrips.myData = [];
@@ -14,19 +28,22 @@ CTPS.bostonTrips.szServerRoot = location.protocol + '//' + location.hostname + '
 CTPS.bostonTrips.szWMSserverRoot = CTPS.bostonTrips.szServerRoot + '/wms'; 
 CTPS.bostonTrips.szWFSserverRoot = CTPS.bostonTrips.szServerRoot + '/wfs';
 
+CTPS.bostonTrips.oCorridors = {}; // Vector layer for OpenLayers map
+
 //  VARIABLES FOR FREQUENTLY USED LAYER FILES
 var ne_states = 'postgis:mgis_nemask_poly';
 var towns_base = 'postgis:plan2035_towns_modelarea';
-var OD_districts_2012 = 'postgis:plan2040_od_boscen_2012';
-var OD_districts_2040 = 'postgis:plan2040_od_boscen_2040';
+var OD_corridors_2012 = 'postgis:plan2040_od_boscen_2012'; 
+var OD_corridors_2040 = 'postgis:plan2040_od_boscen_2040'; 
+var OD_corridors; // The value of this will either be OD_corridors_2012 or OD_corridors_2040
 var roadways = 'postgis:ctps_roadinventory_grouped';
 var MA_mask = 'postgis:ctps_ma_wo_model_area';
 
 // OTHER GLOBAL VARIABLES
- var t = 0;  //  NOTE:  't' is a flag used in function to toggle 'displayCore' function on and off--used because old jQuery 'toggle' function deprecated.
- var strExtraLegend = '<span class="pix"><img src="images/BOS02.bmp" width="24" height="10" alt="" /></span><span id="BBD" class="pix_text">Boston Business District </span><br>'
- strExtraLegend += '<span class="pix"><img src="images/CEN02.bmp" width="24" height="10" alt="" /></span><span id="CEN_area" class="pix_text">Central Area </span><br>'
- var my_year = '', OD_districts;
+var t = 0;  //  NOTE:  't' is a flag used in function to toggle 'displayCore' function on and off--used because old jQuery 'toggle' function deprecated.
+var strExtraLegend = '<span class="pix"><img src="images/BOS02.bmp" width="24" height="10" alt="" /></span><span id="BBD" class="pix_text">Boston Business District </span><br>'
+strExtraLegend += '<span class="pix"><img src="images/CEN02.bmp" width="24" height="10" alt="" /></span><span id="CEN_area" class="pix_text">Central Area </span><br>'
+var my_year = '';
  
  
 /* ****************   1. UTILITY FUNCTIONS  ***************/
@@ -38,7 +55,7 @@ function unhide(divID) {
 	if (item) {
 		item.className=(item.className==='hidden')?'unhidden':'hidden';
 	}
-}; // unhide()
+} // unhide()
 
 // toggle elements on and off, works in conjunction with class definitions in CSS file
 // NOTE: difference from 'unhide' above is that 'unhide' works with 'visibility' CSS; 'toggle..' works with 'display..' CSS
@@ -48,14 +65,14 @@ function toggle_turn_on(divID) {
 	if (item) {
 		item.className=(item.className==='turned_off')?'turned_on':'turned_off';
 	}
-}; // toggle_turn_on()
+} // toggle_turn_on()
 
 function toggle_disable(element) {
     var item2 = document.getElementById(element);
     if (item2) {
         item2.disabled=(item2.disabled===true)?false:true;
     }
-};
+}
 
 function popup(url) {
     popupWindow = window.open(url,'popUpWindow','height=700,width=600,left=600,top=10,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,directories=no,status=yes')
@@ -66,11 +83,11 @@ function popup(url) {
 
 /* **************   2. INITIALIZE PAGE, DRAW MAP  *****************/
 CTPS.bostonTrips.init = function(){  
-  
-    //Populate "select municipality" combo box.
-	var i;        
-	var oSelect = document.getElementById("selected_district"); 
-	var oOption;  // An <option> to be added to the  <select>.
+ 	var i, oSelect, oOption, oBaseLayers;  
+    
+    //Populate "#selected_corridor" combo box
+	oSelect = document.getElementById("selected_corridor"); 
+	oOption;  // An <option> to be added to the  <select>.
 	for (i = 0; i < MPMUTILS.OD_corridors.length; i++) {           
         oOption = document.createElement("OPTION");
         oOption.value = MPMUTILS.OD_corridors[i][0];
@@ -99,11 +116,11 @@ CTPS.bostonTrips.init = function(){
 		})
 	});
 	
-	oDistricts = new ol.layer.Tile({	
+	CTPS.bostonTrips.oCorridors = new ol.layer.Tile({	
 		source: new ol.source.TileWMS({
 			url		:  CTPS.bostonTrips.szWMSserverRoot,
 			params	: {
-				'LAYERS'		: 	OD_districts_2012,
+				'LAYERS'		: 	OD_corridors_2012,
 				'STYLES'		: 	'polygon',
 				'TILED'			: 	'true',
 				'TRANSPARENT'	: 	'true'
@@ -111,7 +128,7 @@ CTPS.bostonTrips.init = function(){
 		})
 	});
 	
-	// Define WFS LAYERS
+	// Define vector layers (populated from WFS requests)
 	CTPS.bostonTrips.oHighlightLayer = new ol.layer.Vector({
 		//"Selected District"
 		source	: new ol.source.Vector({
@@ -146,7 +163,7 @@ CTPS.bostonTrips.init = function(){
 		}
 	);	
 	
-	// Define ol3 Map
+	// Define OpenLayers 3 map
 	CTPS.bostonTrips.map = new ol.Map({
 		target	: 'map2',
 		controls: ol.control.defaults().extend([
@@ -155,7 +172,7 @@ CTPS.bostonTrips.init = function(){
 			})
 		]),
 		layers	: [	oBaseLayers,
-					oDistricts,
+					CTPS.bostonTrips.oCorridors,
 					CTPS.bostonTrips.oHighlightLayer	],
 		view	: new ol.View({
 			projection: projection,
@@ -173,23 +190,24 @@ CTPS.bostonTrips.init = function(){
     if (!Modernizr.svg) {
         alert("Display of SVG charts not supported in older browser versions;\n--click 'Accessible Table' button instead to see data table.");
     } else {
-        console.log('SVG supported');
-    };
+        // console.log('SVG supported');
+    }
 }; // END OF 'INIT' FUNCTION
 
 
 //  CTPS.bostonTrips.toggleCoreDisplay = function(){                     //  put here in case this ends up being an old-fashioned function
 $(document).ready(function(){
+    // On-click handler for #displayCore radio button
 	$('#displayCore').click(function(e){                            //  NOTE:  toggle method is DEPRECATED in most recent versions of jQuery  MMcS, July 17, 2014
 		// alert('got within click function');                      //   --this is my half-assed replacement....
 		if (t===0) {
 			$('#displayMPO').attr('checked', false);
 			$('#displayCore').attr('checked', true);
-			// Update oDistricts style
+			// Update oCorridors style
 			var new_style = 'Plan2040_core_outline';
-			var params = oDistricts.getSource().getParams();
+			var params = CTPS.bostonTrips.oCorridors.getSource().getParams();
 			params.STYLES = new_style;
-			oDistricts.getSource().updateParams(params);
+			CTPS.bostonTrips.oCorridors.getSource().updateParams(params);
 			// Pan and Zoom to 'Plan2040_core_outline'
 			var view = CTPS.bostonTrips.map.getView();
 			view.animate({
@@ -205,15 +223,17 @@ $(document).ready(function(){
 			t = 1;
 		};
 	});
+    
+    // On-click handler for #displayMPO radio button
 	$('#displayMPO').click(function(e) {
 		if (t!=0) {
 			$('#displayMPO').attr('checked', true);
 			$('#displayCore').attr('checked', false);
-			// Update oDistricts style
+			// Update oCorridors style
 			var new_style = 'polygon';
-			var params = oDistricts.getSource().getParams();
+			var params = CTPS.bostonTrips.oCorridors.getSource().getParams();
 			params.STYLES = new_style;
-			oDistricts.getSource().updateParams(params);
+			CTSP.bostonTrips.oCorridors.getSource().updateParams(params);
 			// Pan and Zoom to 'polygon' (aka full map), or previous feature extent
 			if (CTPS.bostonTrips.oBoundsFull) {
 				CTPS.bostonTrips.map.getView().fit(
@@ -228,61 +248,63 @@ $(document).ready(function(){
 					zoom: CTPS.bostonTrips.zoomMPO,
 					duration: 2000
 				});
-			};
+			}
 			// Remove extraLegend
 			$('#extraLegend').html('');
 			if ($('#extraLegend').attr('class')==='turned_on'){      
 				toggle_turn_on('extraLegend');
-			};
+			}
 			t = 0;
-		};
+		}
 	});
-}); 
-//}
-
-$(document).ready(function(){
-	$('#year').change(function(){
+    
+    // On-change handler for #selected_year <select> box
+	$('#selected_year').change(function(e){
 		my_year = $(this).val();     
-		// my_year=$('#year :selected').val(); 	// this also works 
+		// my_year=$('#selected_year :selected').val(); 	// this also works 
 		if(my_year==='2040'){
-			OD_districts = OD_districts_2040;
+			OD_corridors = OD_corridors_2040;
 		} else {
-			OD_districts = OD_districts_2012;
-		};
+			OD_corridors = OD_corridors_2012;
+		}
 		
-		if ($('#getDistrict').prop('disabled', true)) {
-			toggle_disable('getDistrict');
-		};
+		if ($('#getCorridor').prop('disabled', true)) {
+			toggle_disable('getCorridor');
+		}
 		
 		CTPS.bostonTrips.resetDisplay();
-	});
-});
+	});    
+}); 
 
 
-/* ***************  3. GET DESIRED DISTRICT, ADD TO HIGHLIGHT LAYER ****************/
-CTPS.bostonTrips.searchForDistrict = function(){
+/* ***************  3. GET DESIRED CORRIDOR, ADD TO HIGHLIGHT LAYER ****************/
+// This is the on-change handler for the #selected_corridor <select> box
+CTPS.bostonTrips.searchForCorridor = function(e){
+    var params, myselect, i, corr_text, pos, cqlFilter, szUrl;
+    
     // initialize variables/data store
 	CTPS.bostonTrips.oHighlightLayer.getSource().clear();
 	
 	// ensure that map is not displaying Boston Business District and Central Area
-	var params = oDistricts.getSource().getParams();
+	params = CTPS.bostonTrips.oCorridors.getSource().getParams();
 	params.STYLES = 'polygon';
-	oDistricts.getSource().updateParams(params);
+	CTPS.bostonTrips.oCorridors.getSource().updateParams(params);
 	// Remove extraLegend
 	$('#extraLegend').html('');
 	if ($('#extraLegend').attr('class')==='turned_on'){      
 		toggle_turn_on('extraLegend');
-	};
+	}
+    // Note: This 't' is global. -- BK 04/12/2019
 	t = 0;
 	$('#displayMPO').attr('checked', true);
 	$('#displayCore').attr('checked', false);
  
 	if ($('#page_bottom').attr('class')==='unhidden'){
 		// unhide('page_bottom');
-	};
-	if ($('#getDistrict').prop('disabled', false)) {
-		toggle_disable('getDistrict');
-	};
+	}
+	if ($('#getCorridor').prop('disabled', false)) {
+		toggle_disable('getCorridor');
+	}
      
 	$('#trips_grid').html('');
 	$('#transit_grid').html('');
@@ -290,214 +312,206 @@ CTPS.bostonTrips.searchForDistrict = function(){
 	if(!(my_year)){     
 		alert('No data YEAR selected yet--\nUse first combo box to select desired year, \nthen hit "Get Data" again');
 		return;
-	};
+	}
 	
-    // get district name from combo box	
-	var myselect=document.getElementById("selected_district")
-	for (var i=0; i<myselect.options.length; i++){
-		if (myselect.options[i].selected==true){          
-			 CTPS.bostonTrips.choice_district = myselect.options[i].value;
-             var corr_text = myselect.options[i].text;
-             var pos = corr_text.indexOf(',');           
+    // Get corridor name from combo box	
+	myselect = document.getElementById("selected_corridor")
+	for (i = 0; i < myselect.options.length; i++){
+		if (myselect.options[i].selected == true){          
+			 CTPS.bostonTrips.choice_corridor = myselect.options[i].value;
+             corr_text = myselect.options[i].text;
+             pos = corr_text.indexOf(',');           
              CTPS.bostonTrips.choice_text = (corr_text.slice(pos + 1)).toUpperCase();    
-		};
-	};
+		}
+	}
 	
-	if (CTPS.bostonTrips.choice_district === '') { 
-		alert("NO DISTRICT SELECTED--TRY AGAIN");
+	if (CTPS.bostonTrips.choice_corridor === '') { 
+		alert("No cooridor selected: try again.");
 		return;
-	};
+	}
 
     //  create WFS query to display district on map    
     if ($('#legendCorr').attr('class')==='turned_off'){
 		toggle_turn_on('legendCorr');
-    };
+    }
     
-    var cqlFilter = "(corridor_no=='" + CTPS.bostonTrips.choice_district + "')";
+    cqlFilter = "(corridor_no=='" + CTPS.bostonTrips.choice_corridor + "')";
 	$('#corridorName').html('Selected Trip Source: &nbsp;&nbsp; <span style="color: #7c1900">' + CTPS.bostonTrips.choice_text + '</span>');
     
-	var szUrl = CTPS.bostonTrips.szWFSserverRoot + '?';
-		szUrl += '&service=wfs';
-		szUrl += '&version=1.0.0';
-		szUrl += '&request=getfeature';
-		szUrl += '&typename=' + OD_districts;
-		szUrl += '&srsname=EPSG:26986';
-		szUrl += '&outputformat=json';
-		szUrl += '&cql_filter=' + cqlFilter;
+	szUrl = CTPS.bostonTrips.szWFSserverRoot + '?';
+    szUrl += '&service=wfs';
+    szUrl += '&version=1.0.0';
+    szUrl += '&request=getfeature';
+    szUrl += '&typename=' + OD_corridors;
+    szUrl += '&srsname=EPSG:26986';
+    szUrl += '&outputformat=json';
+    szUrl += '&cql_filter=' + cqlFilter;
 	$.ajax({ url		: szUrl,
 			 type		: 'GET',
 			 dataType	: 'json',
 			 success	: 	function (data, textStatus, jqXHR) {	
-								var reader = new ol.format.GeoJSON();
+                                var reader, aFeatures, feature, attrs, extent, source, i, j, corridor, oBounds;
+                                
+								reader = new ol.format.GeoJSON();
 								aFeatures = reader.readFeatures(jqXHR.responseText);
-								if (aFeatures.length === 0) {
-									alert('no district with that name found');
+								if (aFeatures.length !== 1) {
+									alert('Error: WFS request returned ' + aFeatures.length + ' features.');
 									CTPS.bostonTrips.clearSelection();
 									return;
-								};
+								}
 								// Clear, then add highlight layer features to map
 								CTPS.bostonTrips.oHighlightLayer.getSource().clear();
 								CTPS.bostonTrips.myData = [];
-								var attrs;
-								var source = CTPS.bostonTrips.oHighlightLayer.getSource();
-								for (var i=0; i<aFeatures.length; i++) {				
-									attrs = aFeatures[i].getProperties();
-									source.addFeature(new ol.Feature(attrs));
+								source = CTPS.bostonTrips.oHighlightLayer.getSource();
+                                
+                                // Process single feature returned
+                                feature = aFeatures[0];
+                                attrs = feature.getProperties();
+								source.addFeature(new ol.Feature(attrs));
 									
-									var fld_name = [
-										'Highway',
-										'Transit',
-										'Bike',
-										'Walk',
-										'Total', 
-										'Percent of ALL Trips to Boston Bus.Dist. or Central area'
-									];
-									var transit_fld = [
-										'Bus',
-										'Rapid Transit',
-										'Commuter Rail',
-										'Ferry',
-										'Total Transit',
-										'Percent of All TRANSIT Trips to Boston Bus.Dist. or Central Area'
-									];
-									var BBD_val = [
-										+(attrs['bbd_highway']),
-										+(attrs['bbd_transit']),
-										+(attrs['bbd_bike']),
-										+(attrs['bbd_walk']),
-										+(attrs['bbd_total']),
-										''
-									];
-									var BBD_pct = [
-										+(attrs['bbd_highway_pct']),      
-										+(attrs['bbd_transit_pct']),
-										+(attrs['bbd_bike_pct']),
-										+(attrs['bbd_walk_pct']),          
-										0,   
-										+(attrs['bbd_corr_share_ptrips'])
-									];
-									BBD_pct[4] = BBD_pct[0] + BBD_pct[1] + BBD_pct[2] + BBD_pct[3];
-									var BBD_T_val = [
-										+(attrs['bbd_t_bus']),
-										+(attrs['bbd_t_rt']),
-										+(attrs['bbd_t_cr']),
-										+(attrs['bbd_t_ferry']),
-										0,
-										''
-									];
-									BBD_T_val[4] = (BBD_T_val[0] + BBD_T_val[1] + BBD_T_val[2] + BBD_T_val[3]).toFixed(0);
+                                var fld_name = [
+                                    'Highway',
+                                    'Transit',
+                                    'Bike',
+                                    'Walk',
+                                    'Total', 
+                                    'Percent of all trips to Boston Business District or Central Area'
+                                ];
+                                var transit_fld = [
+                                    'Bus',
+                                    'Rapid Transit',
+                                    'Commuter Rail',
+                                    'Ferry',
+                                    'Total Transit',
+                                    'Percent of all transit trips to Boston Business District or Central Area'
+                                ];
+                                var BBD_val = [
+                                    +(attrs['bbd_highway']),
+                                    +(attrs['bbd_transit']),
+                                    +(attrs['bbd_bike']),
+                                    +(attrs['bbd_walk']),
+                                    +(attrs['bbd_total']),
+                                    ''
+                                ];
+                                var BBD_pct = [
+                                    +(attrs['bbd_highway_pct']),      
+                                    +(attrs['bbd_transit_pct']),
+                                    +(attrs['bbd_bike_pct']),
+                                    +(attrs['bbd_walk_pct']),          
+                                    0,   
+                                    +(attrs['bbd_corr_share_ptrips'])
+                                ];
+                                BBD_pct[4] = BBD_pct[0] + BBD_pct[1] + BBD_pct[2] + BBD_pct[3];
+                                var BBD_T_val = [
+                                    +(attrs['bbd_t_bus']),
+                                    +(attrs['bbd_t_rt']),
+                                    +(attrs['bbd_t_cr']),
+                                    +(attrs['bbd_t_ferry']),
+                                    0,
+                                    ''
+                                ];
+                                BBD_T_val[4] = (BBD_T_val[0] + BBD_T_val[1] + BBD_T_val[2] + BBD_T_val[3]).toFixed(0);
 									
-									var BBD_T_val_pct = [];
-									for (var j=0; j<5; j++) {
-										BBD_T_val_pct[j] = BBD_T_val[j] / BBD_T_val[4];
-									};
-									BBD_T_val_pct[5] = attrs['bbd_corr_share_ttrips']; 
-									var CEN_val = [
-										+(attrs['cen_highway']),
-										+(attrs['cen_transit']),
-										+(attrs['cen_bike']),
-										+(attrs['cen_walk']),
-										+(attrs['cen_total']),
-										''
-									];									
-									var CEN_pct = [
-										+(attrs['cen_highway_pct']),  
-										+(attrs['cen_transit_pct']),
-										+(attrs['cen_bike_pct']),
-										+(attrs['cen_walk_pct']),
-										0,
-										+(attrs['cen_corr_share_ptrips'])
-									];
-									CEN_pct[4] = CEN_pct[0] + CEN_pct[1] + CEN_pct[2] + CEN_pct[3];
+                                var BBD_T_val_pct = [];
+                                for (j = 0; j < 5; j++) {
+                                    BBD_T_val_pct[j] = BBD_T_val[j] / BBD_T_val[4];
+                                }
+                                BBD_T_val_pct[5] = attrs['bbd_corr_share_ttrips']; 
+                                var CEN_val = [
+                                    +(attrs['cen_highway']),
+                                    +(attrs['cen_transit']),
+                                    +(attrs['cen_bike']),
+                                    +(attrs['cen_walk']),
+                                    +(attrs['cen_total']),
+                                    ''
+                                ];									
+                                var CEN_pct = [
+                                    +(attrs['cen_highway_pct']),  
+                                    +(attrs['cen_transit_pct']),
+                                    +(attrs['cen_bike_pct']),
+                                    +(attrs['cen_walk_pct']),
+                                    0,
+                                    +(attrs['cen_corr_share_ptrips'])
+                                ];
+								CEN_pct[4] = CEN_pct[0] + CEN_pct[1] + CEN_pct[2] + CEN_pct[3];
 									
-									var CEN_T_val = [
-										+(attrs['cen_t_bus']),
-										+(attrs['cen_t_rt']),
-										+(attrs['cen_t_cr']),
-										+(attrs['cen_t_ferry']),
-										0,
-										''
-									];
-									CEN_T_val[4] = (CEN_T_val[0] + CEN_T_val[1] + CEN_T_val[2] + CEN_T_val[3]).toFixed(0);
+                                var CEN_T_val = [
+                                    +(attrs['cen_t_bus']),
+                                    +(attrs['cen_t_rt']),
+                                    +(attrs['cen_t_cr']),
+                                    +(attrs['cen_t_ferry']),
+                                    0,
+                                    ''
+                                ];
+                                CEN_T_val[4] = (CEN_T_val[0] + CEN_T_val[1] + CEN_T_val[2] + CEN_T_val[3]).toFixed(0);
 									
-									var CEN_T_val_pct = [];
-									for (var j=0; j<5; j++) {
-										CEN_T_val_pct[j] = CEN_T_val[j] / CEN_T_val[4];
-									};
-									CEN_T_val_pct[5] = attrs['cen_corr_share_ttrips'];                                        
+								var CEN_T_val_pct = [];
+                                for (j = 0; j < 5; j++) {
+                                    CEN_T_val_pct[j] = CEN_T_val[j] / CEN_T_val[4];
+                                }
+                                CEN_T_val_pct[5] = attrs['cen_corr_share_ttrips'];                                        
 
-									for (var j=0; j<6; j++) {
-										var corridor = attrs['od_corridor'];
-										CTPS.bostonTrips.corridor_name = attrs['OD_CORRIDOR_NAME'];             
-										CTPS.bostonTrips.myData.push([
-											corridor,
-											CTPS.bostonTrips.corridor_name,
-											fld_name[j],
-											BBD_val[j],
-											BBD_pct[j],
-											CEN_val[j],
-											CEN_pct[j],
-											BBD_T_val[j],
-											CEN_T_val[j]
-										]);
-									};
+                                for (j = 0; j < 6; j++) {
+                                    corridor = attrs['od_corridor'];
+                                    CTPS.bostonTrips.corridor_name = attrs['OD_CORRIDOR_NAME'];             
+                                    CTPS.bostonTrips.myData.push([
+                                        corridor,
+                                        CTPS.bostonTrips.corridor_name,
+                                        fld_name[j],
+                                        BBD_val[j],
+                                        BBD_pct[j],
+                                        CEN_val[j],
+                                        CEN_pct[j],
+                                        BBD_T_val[j],
+                                        CEN_T_val[j]
+                                    ]);
+                                }
 
-									for (var i=0; i<6; i++) {
-										var commas_BBD_T = ((+BBD_T_val[i])===0) ? BBD_T_val[i].toLocaleString() : (+BBD_T_val[i]).toLocaleString();
-										var commas_CEN_T = ((+CEN_T_val[i])===0) ? CEN_T_val[i].toLocaleString() : (+CEN_T_val[i]).toLocaleString();
-										
-										CTPS.bostonTrips.myData[i] = {
-										   "field_name"			:	fld_name[i],
-										   "transit_fld"        :	transit_fld[i],
-										   "BBD_val"            :	(BBD_val[i]).toLocaleString(),
-										   "BBD_pct"            :	(+(BBD_pct[i])*100).toFixed(1) + '%',
-										   "CEN_val"            :	(CEN_val[i]).toLocaleString(),
-										   "CEN_pct"            :	(+(CEN_pct[i])*100).toFixed(1) + '%',
-										   "BBD_T_val"          :	+BBD_T_val[i],
-										   "commas_BBD_T_val"   :	commas_BBD_T, 	// NEED BOTH NUMBERS AND COMMA-DELINEATED (TEXT) ITEMS: numbers for chart, text for table
-										   "BBD_T_val_pct"      :	(+(BBD_T_val_pct[i])*100).toFixed(1) + '%',
-										   "CEN_T_val"          :	+CEN_T_val[i],
-										   "commas_CEN_T_val"   :	commas_CEN_T, 	// NEED BOTH NUMBERS AND COMMA-DELINEATED (TEXT) ITEMS: numbers for chart, text for table
-										   "CEN_T_val_pct"      :	(+(CEN_T_val_pct[i])*100).toFixed(1) + '%'
-										};
-									};									 
-								};  //  END SCROLLING THROUGH FEATURES
+                                for (i = 0; i < 6; i++) {
+                                    var commas_BBD_T = ((+BBD_T_val[i])===0) ? BBD_T_val[i].toLocaleString() : (+BBD_T_val[i]).toLocaleString();
+                                    var commas_CEN_T = ((+CEN_T_val[i])===0) ? CEN_T_val[i].toLocaleString() : (+CEN_T_val[i]).toLocaleString();
+                                    
+                                    CTPS.bostonTrips.myData[i] = {
+                                       "field_name"			:	fld_name[i],
+                                       "transit_fld"        :	transit_fld[i],
+                                       "BBD_val"            :	(BBD_val[i]).toLocaleString(),
+                                       "BBD_pct"            :	(+(BBD_pct[i])*100).toFixed(1) + '%',
+                                       "CEN_val"            :	(CEN_val[i]).toLocaleString(),
+                                       "CEN_pct"            :	(+(CEN_pct[i])*100).toFixed(1) + '%',
+                                       "BBD_T_val"          :	+BBD_T_val[i],
+                                       "commas_BBD_T_val"   :	commas_BBD_T, 	// NEED BOTH NUMBERS AND COMMA-DELINEATED (TEXT) ITEMS: numbers for chart, text for table
+                                       "BBD_T_val_pct"      :	(+(BBD_T_val_pct[i])*100).toFixed(1) + '%',
+                                       "CEN_T_val"          :	+CEN_T_val[i],
+                                       "commas_CEN_T_val"   :	commas_CEN_T, 	// NEED BOTH NUMBERS AND COMMA-DELINEATED (TEXT) ITEMS: numbers for chart, text for table
+                                       "CEN_T_val_pct"      :	(+(CEN_T_val_pct[i])*100).toFixed(1) + '%'
+                                    };
+                                }									 
 								
-								// Pan and Zoom to feature(s)
-								var oBounds = { minx: [],
-												miny: [],
-												maxx: [],
-												maxy: [] };
-								for (var i=0; i<aFeatures.length; i++) {
-									oBounds.minx.push(aFeatures[i].getGeometry().getExtent()[0]);
-									oBounds.miny.push(aFeatures[i].getGeometry().getExtent()[1]);
-									oBounds.maxx.push(aFeatures[i].getGeometry().getExtent()[2]);
-									oBounds.maxy.push(aFeatures[i].getGeometry().getExtent()[3]);
-								};
-								CTPS.bostonTrips.oBoundsFull = [	
-									Math.min.apply(null,oBounds.minx),
-									Math.min.apply(null,oBounds.miny),
-									Math.max.apply(null,oBounds.maxx),
-									Math.max.apply(null,oBounds.maxy)
-								];
-								CTPS.bostonTrips.map.getView().fit(
-									CTPS.bostonTrips.oBoundsFull,
-									{ size: CTPS.bostonTrips.map.getSize(),
-									  duration: 2000 }
-								);
+								// Pan and Zoom to feature
+								oBounds = { minx: [], miny: [], maxx: [], maxy: [] };
+                                extent = feature.getGeometry().getExtent();
+                                oBounds.minx.push(extent[0]);
+                                oBounds.miny.push(extent[1]);
+                                oBounds.maxx.push(extent[2]);
+                                oBounds.maxy.push(extent[3]);                               
+								CTPS.bostonTrips.oBoundsFull = [ Math.min.apply(null,oBounds.minx),
+                                                                 Math.min.apply(null,oBounds.miny),
+                                                                 Math.max.apply(null,oBounds.maxx),
+                                                                 Math.max.apply(null,oBounds.maxy) ];
+								CTPS.bostonTrips.map.getView().fit(CTPS.bostonTrips.oBoundsFull,
+									                               { size: CTPS.bostonTrips.map.getSize(), duration: 2000 });
 								
-								// Create Accessible Grids
+								// Create accessible grids and create pie charts
 								CTPS.bostonTrips.renderToGrid();
-								
-								// Create Pie Charts
 								CTPS.bostonTrips.createPieCharts();
-							},  
+							},  // success handler
 			failure		: 	function (qXHR, textStatus, errorThrown ) {
 								alert('WFS request in timerFunc failed.\n' +
 										'Status: ' + textStatus + '\n' +
 										'Error:  ' + errorThrown);
-							}
-	});
+							}   // failure handler
+	}); // WFS request
+    
 	// ALTERNATIVE STYLE FOR 'DISTRICT SELECTION' VECTOR LAYER--PINK-ish, WITH MINIMAL BORDER
 	CTPS.bostonTrips.style = function(feature) {
 		return [
@@ -532,7 +546,7 @@ CTPS.bostonTrips.searchForDistrict = function(){
 		];
 	};
 	CTPS.bostonTrips.oHighlightLayer.setStyle(CTPS.bostonTrips.style);	
-}; // END 'SearchForDistrict' FUNCTION
+}; // END 'searchForCorridor' FUNCTION
 
 
 /* **************   4.  WRITE DATA TO GRID 'trips_grid' USING SELECTED DATA SOURCE   ******************  */
@@ -545,7 +559,7 @@ CTPS.bostonTrips.renderToGrid = function() {
 	var colDesc = [    
 		// { header : 'index', dataIndex : 'MyID', width: '0px', style: 'align="right"' },
 		{ header : 'Mode', dataIndex : 'field_name', width: '200px', style: 'align="right"' }, 
-		{header : 'To Boston Bus. Dist.', dataIndex : 'BBD_val' , width: '100px', style: 'align="right"' }, 
+		{header : 'To Boston Business District', dataIndex : 'BBD_val' , width: '100px', style: 'align="right"' }, 
 		{ header : 'Percent by Mode', dataIndex : 'BBD_pct', width: '180px',	style: 'align="right"' } ,
 		{ header : 'To Central Area', dataIndex : 'CEN_val', width: '100px',	style: 'align="right"' }, 
 		{ header : 'Percent by Mode', dataIndex : 'CEN_pct', width: '100px', style: 'align="right"' }        
@@ -563,7 +577,7 @@ CTPS.bostonTrips.renderToGrid = function() {
 	var colDescTransit = [
 		// {header : 'index', dataIndex : 'MyID', width: '0px', style: 'align="right"' },
 		{ header : 	'Transit Mode', dataIndex : 'transit_fld' , width: '200px', style: 'align="right"' }, 
-		{ header : 	'To Boston Bus. Dist.', dataIndex : 'commas_BBD_T_val' , width: '100px', style: 'align="right"'}, 
+		{ header : 	'To Boston Business District', dataIndex : 'commas_BBD_T_val' , width: '100px', style: 'align="right"'}, 
 		{ header : 	'Percent by Mode', dataIndex : 'BBD_T_val_pct', width: '180px', style: 'align="right"' } ,
 		{ header : 	'To Central Area', dataIndex : 'commas_CEN_T_val' , width: '100px', style: 'align="right"'},
 		{ header : 	'Percent by Mode', dataIndex : 'CEN_T_val_pct', width: '100px', style: 'align="right"' }        
@@ -579,9 +593,9 @@ CTPS.bostonTrips.renderToGrid = function() {
 	});			
 	CTPS.bostonTrips.TransitGrid.loadArrayData(CTPS.bostonTrips.myData);
 	
-	if($('#chart_header').attr('class')==='hidden'){
+	if($('#chart_header').attr('class') === 'hidden'){
 		unhide('chart_header');
-	};	
+	}	
 };
 
 /* **************   5.  CREATE 2 PIE CHARTS SHOWING TRANSIT DISTRIBUTION FOR EACH DESTINATION   ******************  */
@@ -593,7 +607,7 @@ CTPS.bostonTrips.createPieCharts = function() {
 	
 	if ($('#page_bottom').attr('class')==='hidden'){
 		unhide('page_bottom');
-	};
+	}
 	
 	// Attempted hack to get pie chart to show sections with "0%", even if value === 0,
 	// although not fully working -- pie chart often shows "1%" even though data value is = 0.1%.
@@ -773,8 +787,7 @@ CTPS.bostonTrips.createPieCharts = function() {
 			"highlightSegmentOnMouseover": true,
 			"highlightLuminosity": -0.5
 		}  
-	});
-            
+	});      
 }; // END 'renderToGrid' FUNCTION
 
 
@@ -790,7 +803,7 @@ CTPS.bostonTrips.accessible_table = function() {
 		toggle_turn_on('transit_grid');
 		$('#table_switch_text').html('For accessible table of transit mode shares, click here:&nbsp;&nbsp;&nbsp;');
 		$('#switchTable').val('Accessible Table');
-	};
+	}
 }; // END TOGGLE PIE CHARTS/ACCESSIBLE TABLE FUNCTION                                                                                             
 
 
@@ -813,30 +826,25 @@ CTPS.bostonTrips.resetMode = function(){
     $('#pieChart02').html('');
     if ($('#pie_charts').attr('class') === 'turned_off') {
         CTPS.bostonTrips.accessible_table();
-    };
-	if ($('#getDistrict').prop('disabled', true)) {
-        toggle_disable('getDistrict');
-    };
-    if ($('#legendCorr').attr('class')==='turned_on') {
+    }
+	if ($('#getCorridor').prop('disabled', true)) {
+        toggle_disable('getCorridor');
+    }
+    if ($('#legendCorr').attr('class') === 'turned_on') {
 		toggle_turn_on('legendCorr');
-    };
-    if ($('#chart_header').attr('class')==='unhidden') {
+    }
+    if ($('#chart_header').attr('class') === 'unhidden') {
 		unhide('chart_header');
-    };       
-    if ($('#page_bottom').attr('class')==='unhidden') { //  has toggle for pie charts/accessible table
+    };      
+    if ($('#page_bottom').attr('class') === 'unhidden') { //  has toggle for pie charts/accessible table
 		unhide('page_bottom');
-    };
+    }
 }; //  END 'resetMode' FUNCTION
 
 
-/* *************      8. CLEAR ALL VECTOR LAYERS AS WELL AS COMBO BOX USED TO SELECT DISTRICT   *************/
+/* *************      8. CLEAR ALL VECTOR LAYERS AS WELL AS COMBO BOX USED TO SELECT CORRIDOR   *************/
 CTPS.bostonTrips.clearSelection = function() {
-	var oElt = document.getElementById("selected_district");
+	var oElt = document.getElementById("selected_corridor");
 	oElt.selectedIndex = 0; 
 	CTPS.bostonTrips.resetDisplay(); 
 }; // END 'clearSelection' FUNCTION
-
-
-
-
-

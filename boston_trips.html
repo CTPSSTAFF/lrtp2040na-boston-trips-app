@@ -6,22 +6,25 @@
 		<title>Boston-Bound Trips</title>
 
 		<link rel="stylesheet" type="text/css" href="boston_trips.css" />
-
-		<script src="../../../libs/jquery/jquery-1.7.1/jquery-1.7.1.js"></script>
-
+        <link rel="stylesheet" href="libs/ol.css" type="text/css">
+    <!--
+        <script src="../../../libs/jquery/jquery-1.7.1/jquery-1.7.1.js"></script>
 		<script src="../../../libs/openlayers/Openlayers-4.2.0/build/ol.js"></script>
-		<link rel="stylesheet" href="../../../libs/openlayers/Openlayers-4.2.0/css/ol.css" type="text/css">
-		
 		<script src="../../../libs/proj4js/proj4js-2.4.3/dist/proj4-src.js"></script>
-
 		<script src="../../../libs/d3/d3-4.8.0/d3.js"></script>
 		<script src="../../../libs/d3pie/d3pie-0.2.1/d3pie/d3pie.min.js"></script>
-				
+        <script src="libs/modernizr-2.8.2-custom.min.js"></script>  
+	-->
+        <script src="libs/jquery-1.7.1.min.js"></script>
+		<script src="libs/ol.js"></script>
+		<script src="libs/proj4-src.js"></script>
+		<script src="libs/d3.min.js"></script>
+		<script src="libs/d3pie.min.js"></script>
+        <script src="libs/modernizr-2.8.2-custom.min.js"></script>  
+    
 		<script src="boston_trips.js" type="text/javascript"></script>
 		<script src="accessibleGridMPM.js" type="text/javascript"></script> 
 		<script src="mpmutils.js" type="text/javascript"></script>
-		<script src="libs/modernizr-2.8.2-custom.min.js"></script>  
-
 	</head>
 
 
@@ -62,9 +65,9 @@
 			
 			<div id="year_form">
 				<h2>
-					<label for="year">Select desired year:</label>
+					<label for="selected_year">Select desired year:</label>
 				</h2>
-				<select id="year">
+				<select id="selected_year">
 					<option value="2012">Select a year</option>
 					<option value="2012">Base Year: 2012</option>
 					<option value="2040">Future Year: 2040</option>
@@ -73,13 +76,13 @@
 
 			<div id="inputbox"> 
 				<h2>
-					<label for="selected_district">Trips originating in:</label>
+					<label for="selected_corridor">Trips originating in:</label>
 				</h2>
 				<form name="drop_list" action="" method="post" >
-					<select id="selected_district" onchange="CTPS.bostonTrips.resetDisplay()">                                            			
+					<select id="selected_corridor" onchange="CTPS.bostonTrips.resetDisplay()">                                            			
 						<option value="">Select origin corridor</option>
 					</select>
-					<input type="button" id="getDistrict" value="Get Data" disabled="true" onclick="CTPS.bostonTrips.searchForDistrict()" title="button opens mode share data table read with table commands" alt="button opens mode share data table"/>                                            
+					<input type="button" id="getCorridor" value="Get Data" disabled="true" onclick="CTPS.bostonTrips.searchForCorridor()" title="button opens mode share data table read with table commands" alt="button opens mode share data table"/>                                            
 				</form>
 			</div>	<!--    end of input box  -->	
 
