@@ -7,8 +7,8 @@
 // It is currently being modified by yours truly for the 2040 LRTP. 
 //
 // It is clear that aside from modifying the app fetch data for the 2040 LRTP, the code for this app is in need of a lot of TLC. 
-// How much can be applied is a function of budget and schedule matters outside of this reporter's control. 
-// The only requirement is to make the damned thing work with the 2016/2040 data.
+// How much can be applied is a function of budget and schedule matters not under the control of yours truly.
+// The only *requirement* is to make the thing work with the 2016/2040 data.
 //
 // BK 12 April 2019
 
@@ -32,10 +32,10 @@ CTPS.bostonTrips.oCorridors = {}; // Vector layer for OpenLayers map
 
 //  VARIABLES FOR FREQUENTLY USED LAYER FILES
 var ne_states = 'postgis:mgis_nemask_poly';
-var towns_base = 'postgis:plan2035_towns_modelarea';
-var OD_corridors_2012 = 'postgis:plan2040_od_boscen_2012'; 
-var OD_corridors_2040 = 'postgis:plan2040_od_boscen_2040'; 
-var OD_corridors; // The value of this will either be OD_corridors_2012 or OD_corridors_2040
+var towns_base = 'postgis:dest2040_towns_modelarea';
+var OD_corridors_2016 = 'postgis:dest2040_od_boscen_2016'; 
+var OD_corridors_2040 = 'postgis:dest2040_od_boscen_2040'; 
+var OD_corridors; // The value of this variable will either be OD_corridors_2012 or OD_corridors_2040
 var roadways = 'postgis:ctps_roadinventory_grouped';
 var MA_mask = 'postgis:ctps_ma_wo_model_area';
 
@@ -85,13 +85,14 @@ function popup(url) {
 CTPS.bostonTrips.init = function(){  
  	var i, oSelect, oOption, oBaseLayers;  
     
-    //Populate "#selected_corridor" combo box
+    // Populate #selected_corridor combo box of corridor names
+    // Note that we do NOT list the "external" corridors (within the statewide model as well as outside of it)
 	oSelect = document.getElementById("selected_corridor"); 
 	oOption;  // An <option> to be added to the  <select>.
-	for (i = 0; i < MPMUTILS.OD_corridors.length; i++) {           
+	for (i = 0; i < MPMUTILS.OD_corridors_2016.length; i++) {           
         oOption = document.createElement("OPTION");
-        oOption.value = MPMUTILS.OD_corridors[i][0];
-        oOption.text = /*MPMUTILS.OD_corridors[i][0] + ', ' + */MPMUTILS.OD_corridors[i][4]; 
+        oOption.value = MPMUTILS.OD_corridors_2016[i][0];
+        oOption.text = /*MPMUTILS.OD_corridors[i][0] + ', ' + */ MPMUTILS.OD_corridors_2016[i][4]; 
         oSelect.options.add(oOption);
     }
     
@@ -120,7 +121,7 @@ CTPS.bostonTrips.init = function(){
 		source: new ol.source.TileWMS({
 			url		:  CTPS.bostonTrips.szWMSserverRoot,
 			params	: {
-				'LAYERS'		: 	OD_corridors_2012,
+				'LAYERS'		: 	OD_corridors_2016,
 				'STYLES'		: 	'polygon',
 				'TILED'			: 	'true',
 				'TRANSPARENT'	: 	'true'
@@ -265,7 +266,7 @@ $(document).ready(function(){
 		if(my_year==='2040'){
 			OD_corridors = OD_corridors_2040;
 		} else {
-			OD_corridors = OD_corridors_2012;
+			OD_corridors = OD_corridors_2016;
 		}
 		
 		if ($('#getCorridor').prop('disabled', true)) {
@@ -313,8 +314,7 @@ CTPS.bostonTrips.searchForCorridor = function(e){
 		alert('No data YEAR selected yet--\nUse first combo box to select desired year, \nthen hit "Get Data" again');
 		return;
 	}
-	
-    // Get corridor name from combo box	
+    // Get selected corridor
 	myselect = document.getElementById("selected_corridor")
 	for (i = 0; i < myselect.options.length; i++){
 		if (myselect.options[i].selected == true){          
@@ -326,7 +326,7 @@ CTPS.bostonTrips.searchForCorridor = function(e){
 	}
 	
 	if (CTPS.bostonTrips.choice_corridor === '') { 
-		alert("No cooridor selected: try again.");
+		alert("No corridor selected: try again.");
 		return;
 	}
 
@@ -528,10 +528,21 @@ CTPS.bostonTrips.searchForCorridor = function(e){
 							})
 						}),
 				geometry: function(feature) {
-							// expecting a MultiPolygon here, makes sure only one label is generated:
-							// https://stackoverflow.com/questions/33484283/restrict-labeling-to-one-label-for-multipolygon-features
-							var interiorPoints = feature.getGeometry().getInteriorPoints();
-							return interiorPoints.getPoint(0);
+                            // The feature may have EITHER Polygon OR MultiPolygon geometry.
+                            // Legacy comments from Ethan:
+							//      expecting a MultiPolygon here, makes sure only one label is generated:
+							//      https://stackoverflow.com/questions/33484283/restrict-labeling-to-one-label-for-multipolygon-features
+                            var geom, ftype, interiorPoints, interiorPoints, retval;
+                            geom = feature.getGeometry();
+                            ftype = geom.getType();
+                            if (ftype === "MultiPolygon") {
+                                interiorPoints = geom.getInteriorPoints();
+                                retval = interiorPoints.getPoint(0);
+                            } else {
+                                interiorPoint = geom.getInteriorPoint();
+                                retval = interiorPoint;
+                            }                             
+							return retval;
 						}
 			}),
 			new ol.style.Style({
