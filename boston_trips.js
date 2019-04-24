@@ -33,8 +33,8 @@ CTPS.bostonTrips.oCorridors = {}; // Vector layer for OpenLayers map
 //  VARIABLES FOR FREQUENTLY USED LAYER FILES
 var ne_states = 'postgis:mgis_nemask_poly';
 var towns_base = 'postgis:dest2040_towns_modelarea';
-var OD_corridors_2016 = 'postgis:dest2040_od_boscen_2016'; 
-var OD_corridors_2040 = 'postgis:dest2040_od_boscen_2040'; 
+var OD_corridors_2016 = 'dest2040_viewer:dest2040_od_boscen_2016'; 
+var OD_corridors_2040 = 'dest2040_viewer:dest2040_od_boscen_2040'; 
 var OD_corridors; // The value of this variable will either be OD_corridors_2012 or OD_corridors_2040
 var roadways = 'postgis:ctps_roadinventory_grouped';
 var MA_mask = 'postgis:ctps_ma_wo_model_area';
