@@ -97,6 +97,62 @@ MPMUTILS.externals_2012 = [
 ["54","Southeast of Boston MPO (South Shore, Fall River-New Bedford, Cape Cod, etc.)"]
 ];  //  end MPMUTILS.externals_2012
 
+// Keeping with MMcS's practice, this is an array-of-arrays rather than an array-of-objects.
+// Indices for the sub-arrays are as follows:
+// [0] - district number, e.g., 1
+// [1] - district name, e.g., "gd01"
+// {2] - string with list of towns/neighborhoods/whatever in the district
+MPMUTILS.modelDistricts_2016 = [
+[1, "gd01","Boston (Downtown East of Charles Street)"],
+[2, "gd02","Boston (South Boston, Seaport District)"],
+[3, "gd03","Boston (Back Bay and South End)"],
+[4, "gd04","Boston (East Boston, Logan Airport)"],
+[5, "gd05","Boston (Deer Island), Chelsea, Revere, Winthrop"],
+[6, "gd06","Boston (Charlestown), Malden, Medford, Everett"],
+[7, "gd07","Somerville"],
+[8, "gd08","Cambridge"],
+[9, "gd09","Boston (Allston, Cambridge), Brookline"],
+[10, "gd10","Boston (Roxbury, Jamaica Plain, Roslindale (part), Mattapan (part))"],
+[11, "gd11","Boston (South Boston, Dorchester, Mattapan (part))"],
+[12, "gd12","Lynn, Nahant, Saugus"],
+[13, "gd13","Melrose, Stoneham, Wakefield, Winchester, Woburn"],
+[14, "gd14","Arlington, Belmont, Watertown"],
+[15, "gd15","Lexington, Waltham"],
+[16, "gd16","Newton"],
+[17, "gd17","Boston (Hyde Park, West Roxbury, Roslindale (part)), Dedham"],
+[18, "gd18","Boston (Harbor Islands), Milton, Quincy"],
+[19, "gd19","Beverly, Hamilton, Marblehead, Salem, Swampscott, Wenham"],
+[20, "gd20","Boxford, Danvers, Lynnfield, Middleton, Peabody, Topsfield"],
+[21, "gd21","North Reading, Reading, Wilmington"],
+[22, "gd22","Andover, North Andover, Tewksbury"],
+[23, "gd23","Billerica, Burlington"],
+[24, "gd24","Acton, Bedford, Carlisle, Concord, Lincoln, Maynard"],
+[25, "gd25","Dover, Natick, Needham, Wayland, Wellesley, Weston"],
+[26, "gd26","Ashland, Framingham, Holliston, Sherborn, Sudbury"],
+[27, "gd27","Medfield, Millis, Norfolk, Norwood, Sharon, Walpole, Westwood"],
+[28, "gd28","Canton, Holbrook, Randolph"],
+[29, "gd29","Abington, Avon, Brockton, Whitman"],
+[30, "gd30","Braintree, Weymouth"],
+[31, "gd31","Cohasset, Hingham, Hull, Marshfield, Norwell, Rockland, Scituate"],
+[32, "gd32","Essex, Georgetown, Gloucester, Ipswich, Manchester, Rockport, Rowley"],
+[33, "gd33","Amesbury, Groveland, Merrimac, Newbury, Newburyport, Salisbury, West Newbury"],
+[34, "gd34","Haverhill, Lawrence, Methuen"],
+[35, "gd35","Chelmsford, Dracut, Dunstable, Lowell, Tyngsborough"],
+[36, "gd36","Ayer, Bolton, Boxborough, Clinton, Groton, Harvard, Lancaster, Littleton, Pepperell, Shirley, Stow, Westford"],
+[37, "gd37","Berlin, Hopkinton, Hudson, Marlborough, Northborough, Northbridge, Southborough, Upton, Westborough"],
+[38, "gd38","Bellingham, Blackstone, Franklin, Hopedale, Medway, Mendon, Milford, Millville, Uxbridge"],
+[39, "gd39","Attleboro, Foxborough, Mansfield, North Attleborough, Norton, Plainville, Wrentham"],
+[40, "gd40","Bridgewater, East Bridgewater, Easton, Lakeville, Middleborough, Raynham, Stoughton, Taunton, West Bridgewater"],
+[41, "gd41","Carver, Duxbury, Halifax, Hanover, Hanson, Kingston, Pembroke, Plymouth, Plympton"]
+]; //  end MPMUTILS.modelDistricts_2016
+
+MPMUTILS.externals_2016 = [
+[51, "gd51","North of Boston MPO (New Hampshire, Maine, etc.)"],
+[52, "gd52","West of Boston MPO (Central Massachusetts and points west)"],
+[53, "gd53","Southwest of Boston MPO (Rhode Island, Connecticut, etc.)"],
+[54, "gd54","Southeast of Boston MPO (South Shore, Fall River-New Bedford, Cape Cod, etc.)"]
+];  //  end MPMUTILS.externals_2016
+
 // 2012 O/D corridors:
 //                  0          1              2               3                4                
 //  Fields are:  INDEX   OD_CORRIDOR	CORRIDOR_NO	    CORRIDOR_TXT	OD_CORRIDOR_NAME
