@@ -5,6 +5,4 @@ The source code for this app was originally written by Mary McShane for the 2014
 
 It was migrated to OpenLayers version 3 by Ethan Ebinger in 2017.
 
-In 2018 it was (minimally) modified by yours truly to read data from a PostGIS data source rather than an Oracle/ArcGIS datasource.
-
-It is currently being modified by yours truly for the 2040 LRTP. 
+In 2018 it was (minimally) modified by Ben Krepp to read data from a PostGIS data source rather than an Oracle/ArcGIS datasource. 
